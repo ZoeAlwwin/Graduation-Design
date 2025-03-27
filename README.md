@@ -1,39 +1,73 @@
-# recipe-management-system
+# 食谱管理系统 (Recipe Management System)
 
-This template should help get you started developing with Vue 3 in Vite.
+这是一个基于Vue 3和Vite构建的现代化食谱管理系统，旨在帮助用户存储、查找和管理自己喜爱的食谱。
 
-## Recommended IDE Setup
+## 项目功能
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+- 添加和编辑食谱
+- 按类别和标签搜索食谱
+- 收藏喜爱的食谱
+- 查看详细的食谱信息
+- 个人食谱收藏夹
 
-## Type Support for `.vue` Imports in TS
+## 技术栈
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+- 前端框架：Vue 3
+- 构建工具：Vite
+- 语言：TypeScript
+- CSS预处理器：[待选择]
+- 状态管理：Pinia
+- 路由：Vue Router
 
-## Customize configuration
+## 开发环境设置
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+推荐使用[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar)进行开发（并禁用Vetur）。
 
-## Project Setup
+### 安装依赖
 
 ```sh
 npm install
 ```
 
-### Compile and Hot-Reload for Development
+### 开发环境运行
 
 ```sh
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+### 类型检查、编译和压缩用于生产环境
 
 ```sh
 npm run build
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+### 使用ESLint进行代码检查
 
 ```sh
 npm run lint
 ```
+
+## 项目结构
+
+- `src/components`：可复用组件
+- `src/views`：页面组件
+- `src/stores`：状态管理
+- `src/types`：TypeScript类型定义
+- `src/router`：路由配置
+- `src/assets`：静态资源
+
+## 贡献指南
+
+1. Fork本仓库
+2. 创建你的特性分支 (`git checkout -b feature/amazing-feature`)
+3. 提交你的更改 (`git commit -m '添加某项功能'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 开启一个Pull Request
+
+## 开发进度
+
+- [x] 项目初始化和基础设置
+- [ ] 核心功能实现
+- [ ] UI/UX优化
+- [ ] 测试
+- [ ] 文档完善
