@@ -1,315 +1,462 @@
 /**
- * 食谱状态管理模块
- * 使用Pinia管理食谱数据，包括食谱的CRUD操作、收藏管理和搜索过滤等功能
- * 数据持久化使用LocalStorage实现
+ * 食谱管理模块
+ * 使用Pinia管理食谱数据，包括CRUD操作和过滤功能
+ * 通过API与后端通信，持久化存储食谱数据
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { recipeApi } from '@/services/api'
 import type { Recipe, RecipeFilter } from '@/types/recipe'
-import { v4 as uuidv4 } from 'uuid'
+import { useUserStore } from './user'
+
+// 定义搜索参数类型
+interface SearchParams {
+  title?: string
+  category?: string[]
+  tags?: string[]
+  cuisine?: string
+  difficulty?: string
+  author?: string
+  favorites?: boolean
+  page?: number
+  limit?: number
+  [key: string]: unknown
+}
+
+// 定义API错误类型
+interface ApiError {
+  message?: string
+  status?: number
+  [key: string]: unknown
+}
+
+// 定义API响应类型
+interface ApiResponse<T> {
+  data: T
+  pagination?: {
+    page: number
+    totalPages: number
+    total: number
+  }
+}
 
 export const useRecipeStore = defineStore('recipe', () => {
-  // 状态定义 - 应用的核心数据
-  const recipes = ref<Recipe[]>([])               // 所有食谱列表
-  const favoriteRecipes = ref<string[]>([])       // 收藏的食谱ID列表
-  const categories = ref<string[]>(['早餐', '午餐', '晚餐', '甜点', '小吃', '汤品', '主食', '沙拉'])  // 预定义食谱分类
-  const popularTags = ref<string[]>(['快手菜', '家常菜', '低脂', '高蛋白', '素食', '辣', '甜', '酸'])  // 预定义食谱标签
-  
-  // 获取器 - 定义计算属性和过滤方法
-  
-  /**
-   * 获取所有食谱
-   * @returns 完整的食谱列表
-   */
-  const getAllRecipes = computed(() => recipes.value)
-  
-  /**
-   * 获取收藏的食谱
-   * @returns 用户收藏的食谱列表
-   */
-  const getFavoriteRecipes = computed(() => {
-    return recipes.value.filter(recipe => favoriteRecipes.value.includes(recipe.id))
-  })
-  
-  /**
-   * 获取推荐的食谱（随机选择几个）
-   * @returns 随机选择的食谱作为推荐
-   */
-  const getRecommendedRecipes = computed(() => {
-    const shuffled = [...recipes.value].sort(() => 0.5 - Math.random())
-    return shuffled.slice(0, Math.min(4, shuffled.length))
-  })
-  
-  /**
-   * 按照过滤条件筛选食谱
-   * @param filter 筛选条件对象
-   * @returns 符合条件的食谱列表
-   */
-  const getFilteredRecipes = (filter: RecipeFilter) => {
-    return recipes.value.filter(recipe => {
-      // 按照标题或描述搜索
-      if (filter.search && !recipe.title.toLowerCase().includes(filter.search.toLowerCase()) && 
-          !recipe.description.toLowerCase().includes(filter.search.toLowerCase())) {
-        return false
+  // 状态
+  const recipes = ref<Recipe[]>([])
+  const isLoading = ref(false)
+  const error = ref('')
+  const currentPage = ref(1)
+  const totalPages = ref(1)
+  const totalRecipes = ref(0)
+  const currentRecipe = ref<Recipe | null>(null)
+
+  // 用户存储
+  const userStore = useUserStore()
+
+  // 计算属性
+  const popularCategories = computed(() => {
+    const categoryCounts: Record<string, number> = {}
+    recipes.value.forEach((recipe) => {
+      if (Array.isArray(recipe.category)) {
+        recipe.category.forEach((cat: string) => {
+          categoryCounts[cat] = (categoryCounts[cat] || 0) + 1
+        })
       }
-      
-      // 按照分类筛选
-      if (filter.category && recipe.category !== filter.category) {
-        return false
+    })
+
+    return Object.entries(categoryCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([category]) => category)
+  })
+
+  const popularTags = computed(() => {
+    const tagCounts: Record<string, number> = {}
+    recipes.value.forEach((recipe) => {
+      recipe.tags.forEach((tag) => {
+        tagCounts[tag] = (tagCounts[tag] || 0) + 1
+      })
+    })
+
+    return Object.entries(tagCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([tag]) => tag)
+  })
+
+  // 获取所有分类
+  const categories = computed(() => {
+    const categorySet = new Set<string>()
+    recipes.value.forEach((recipe) => {
+      if (Array.isArray(recipe.category)) {
+        recipe.category.forEach((cat: string) => {
+          categorySet.add(cat)
+        })
       }
-      
-      // 按照标签筛选
+    })
+    return Array.from(categorySet)
+  })
+
+  // 根据筛选条件过滤食谱
+  const getFilteredRecipes = (filter: {
+    search?: string
+    category?: string
+    tags?: string[]
+    difficulty?: string
+    maxPrepTime?: number
+    maxCookTime?: number
+    ingredients?: string[]
+  }) => {
+    return recipes.value.filter((recipe) => {
+      // 搜索标题和描述
+      if (filter.search) {
+        const searchLower = filter.search.toLowerCase()
+        if (
+          !recipe.title.toLowerCase().includes(searchLower) &&
+          !recipe.description.toLowerCase().includes(searchLower)
+        ) {
+          return false
+        }
+      }
+
+      // 分类筛选
+      if (filter.category && recipe.category) {
+        if (!recipe.category.includes(filter.category)) {
+          return false
+        }
+      }
+
+      // 标签筛选
       if (filter.tags && filter.tags.length > 0) {
-        const hasAllTags = filter.tags.every(tag => recipe.tags.includes(tag))
-        if (!hasAllTags) return false
+        if (!filter.tags.every((tag) => recipe.tags.includes(tag))) {
+          return false
+        }
       }
-      
-      // 按照难度筛选
+
+      // 难度筛选
       if (filter.difficulty && recipe.difficulty !== filter.difficulty) {
         return false
       }
-      
-      // 按照准备时间筛选
-      if (filter.maxPrepTime !== undefined && recipe.prepTime > filter.maxPrepTime) {
+
+      // 准备时间筛选
+      if (filter.maxPrepTime && recipe.prepTime > filter.maxPrepTime) {
         return false
       }
-      
-      // 按照烹饪时间筛选
-      if (filter.maxCookTime !== undefined && recipe.cookTime > filter.maxCookTime) {
+
+      // 烹饪时间筛选
+      if (filter.maxCookTime && recipe.cookTime > filter.maxCookTime) {
         return false
       }
-      
-      // 按照材料筛选
+
+      // 食材筛选
       if (filter.ingredients && filter.ingredients.length > 0) {
-        const recipeIngredientNames = recipe.ingredients.map(ing => ing.name.toLowerCase())
-        const hasAllIngredients = filter.ingredients.every(ingName => 
-          recipeIngredientNames.some(name => name.includes(ingName.toLowerCase()))
-        )
-        if (!hasAllIngredients) return false
+        if (
+          !filter.ingredients.every((ingredient) =>
+            recipe.ingredients.some((item) =>
+              item.name.toLowerCase().includes(ingredient.toLowerCase()),
+            ),
+          )
+        ) {
+          return false
+        }
       }
-      
+
       return true
     })
   }
-  
-  // 动作方法 - 定义修改状态的函数
-  
-  /**
-   * 添加新食谱
-   * @param recipeData 食谱数据（不包含id、创建时间等自动生成的字段）
-   * @returns 新创建的食谱ID
-   */
-  const addRecipe = (recipeData: Omit<Recipe, 'id' | 'createdAt' | 'updatedAt' | 'isFavorite'>) => {
-    const newRecipe: Recipe = {
-      ...recipeData,
-      id: uuidv4(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      isFavorite: false
-    }
-    
-    recipes.value.push(newRecipe)
-    saveRecipesToLocalStorage()
-    return newRecipe.id
+
+  // 初始化食谱数据
+  const initialize = async () => {
+    if (recipes.value.length > 0) return
+
+    await fetchAllRecipes()
   }
-  
-  /**
-   * 更新现有食谱
-   * @param id 食谱ID
-   * @param recipeData 要更新的食谱数据
-   * @returns 是否更新成功
-   */
-  const updateRecipe = (id: string, recipeData: Partial<Recipe>) => {
-    const index = recipes.value.findIndex(recipe => recipe.id === id)
-    if (index !== -1) {
-      recipes.value[index] = {
-        ...recipes.value[index],
-        ...recipeData,
-        updatedAt: new Date().toISOString()
+
+  // 获取所有食谱
+  const fetchAllRecipes = async (filter?: RecipeFilter) => {
+    isLoading.value = true
+    error.value = ''
+
+    try {
+      // 转换 filter 为 API 参数格式
+      const apiParams = filter
+        ? {
+            ...filter,
+            category: filter.category ? [filter.category] : undefined,
+            page: filter.page || 1,
+            limit: filter.limit || 12,
+          }
+        : {
+            page: 1,
+            limit: 12,
+          }
+
+      const response = await recipeApi.getAllRecipes(apiParams)
+      const { data, pagination } = response as ApiResponse<Recipe[]>
+
+      // 更新分页信息
+      if (pagination) {
+        currentPage.value = pagination.page
+        totalPages.value = pagination.totalPages
+        totalRecipes.value = pagination.total
       }
-      saveRecipesToLocalStorage()
-      return true
+
+      // 直接使用服务器返回的数据
+      recipes.value = data
+
+      return data
+    } catch (err: unknown) {
+      const apiError = err as ApiError
+      console.error('获取食谱列表失败:', apiError)
+      error.value = apiError.message || '获取食谱列表失败，请稍后重试'
+      return []
+    } finally {
+      isLoading.value = false
     }
-    return false
   }
-  
-  /**
-   * 删除食谱
-   * @param id 要删除的食谱ID
-   * @returns 是否删除成功
-   */
-  const deleteRecipe = (id: string) => {
-    const index = recipes.value.findIndex(recipe => recipe.id === id)
-    if (index !== -1) {
-      recipes.value.splice(index, 1)
-      
-      // 如果在收藏列表中，也要移除
-      const favIndex = favoriteRecipes.value.indexOf(id)
-      if (favIndex !== -1) {
-        favoriteRecipes.value.splice(favIndex, 1)
+
+  // 根据ID获取单个食谱
+  const getRecipeById = async (id: string): Promise<Recipe | null> => {
+    // 验证 ID
+    if (!id || id === 'undefined') {
+      console.error('无效的食谱ID')
+      return null
+    }
+
+    // 先从本地缓存查找
+    const cachedRecipe = recipes.value.find((r) => r.id === id)
+    if (cachedRecipe) {
+      return cachedRecipe
+    }
+
+    // 如果本地没有，从API获取
+    isLoading.value = true
+    error.value = ''
+
+    try {
+      const response = await recipeApi.getRecipe(id)
+      const recipe = response.data
+
+      // 添加到本地缓存
+      const existingIndex = recipes.value.findIndex((r) => r.id === recipe.id)
+      if (existingIndex === -1) {
+        recipes.value.push(recipe)
+      } else {
+        recipes.value[existingIndex] = recipe
       }
-      
-      saveRecipesToLocalStorage()
+
+      return recipe
+    } catch (err: unknown) {
+      const apiError = err as ApiError
+      console.error(`获取食谱 ${id} 失败:`, apiError)
+      error.value = apiError.message || '获取食谱失败，请稍后重试'
+      return null
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  // 添加新食谱
+  const addRecipe = async (recipe: Partial<Recipe>): Promise<Recipe | null> => {
+    isLoading.value = true
+    error.value = ''
+
+    try {
+      const response = await recipeApi.createRecipe(recipe)
+      const newRecipe = response.data
+
+      // 添加到本地缓存
+      recipes.value.unshift(newRecipe)
+
+      return newRecipe
+    } catch (err: unknown) {
+      const apiError = err as ApiError
+      console.error('添加食谱失败:', apiError)
+      error.value = apiError.message || '添加食谱失败，请稍后重试'
+      return null
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  // 更新食谱
+  const updateRecipe = async (id: string, data: Partial<Recipe>): Promise<Recipe | null> => {
+    isLoading.value = true
+    error.value = ''
+
+    try {
+      const response = await recipeApi.updateRecipe(id, data)
+      const updatedRecipe = response.data
+
+      // 更新本地缓存
+      const index = recipes.value.findIndex((r) => r.id === id)
+      if (index !== -1) {
+        recipes.value[index] = updatedRecipe
+      }
+
+      return updatedRecipe
+    } catch (err: unknown) {
+      const apiError = err as ApiError
+      console.error(`更新食谱 ${id} 失败:`, apiError)
+      error.value = apiError.message || '更新食谱失败，请稍后重试'
+      return null
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  // 删除食谱
+  const deleteRecipe = async (id: string): Promise<boolean> => {
+    isLoading.value = true
+    error.value = ''
+
+    try {
+      await recipeApi.deleteRecipe(id)
+
+      // 从本地缓存中删除
+      recipes.value = recipes.value.filter((r) => r.id !== id)
+
       return true
-    }
-    return false
-  }
-  
-  /**
-   * 切换食谱的收藏状态
-   * @param id 食谱ID
-   */
-  const toggleFavorite = (id: string) => {
-    const index = favoriteRecipes.value.indexOf(id)
-    if (index === -1) {
-      favoriteRecipes.value.push(id)
-    } else {
-      favoriteRecipes.value.splice(index, 1)
-    }
-    
-    // 更新食谱的isFavorite状态
-    const recipeIndex = recipes.value.findIndex(recipe => recipe.id === id)
-    if (recipeIndex !== -1) {
-      recipes.value[recipeIndex].isFavorite = !recipes.value[recipeIndex].isFavorite
-    }
-    
-    saveRecipesToLocalStorage()
-  }
-  
-  // 数据持久化方法
-  
-  /**
-   * 从本地存储加载食谱数据
-   */
-  const loadRecipesFromLocalStorage = () => {
-    const storedRecipes = localStorage.getItem('recipes')
-    const storedFavorites = localStorage.getItem('favoriteRecipes')
-    
-    if (storedRecipes) {
-      recipes.value = JSON.parse(storedRecipes)
-    }
-    
-    if (storedFavorites) {
-      favoriteRecipes.value = JSON.parse(storedFavorites)
+    } catch (err: unknown) {
+      const apiError = err as ApiError
+      console.error(`删除食谱 ${id} 失败:`, apiError)
+      error.value = apiError.message || '删除食谱失败，请稍后重试'
+      return false
+    } finally {
+      isLoading.value = false
     }
   }
-  
-  /**
-   * 保存食谱数据到本地存储
-   */
-  const saveRecipesToLocalStorage = () => {
-    localStorage.setItem('recipes', JSON.stringify(recipes.value))
-    localStorage.setItem('favoriteRecipes', JSON.stringify(favoriteRecipes.value))
-  }
-  
-  /**
-   * 初始化加载食谱数据，如果没有则添加示例食谱
-   */
-  const initialize = () => {
-    loadRecipesFromLocalStorage()
-    
-    // 如果没有食谱数据，可以添加一些示例食谱
-    if (recipes.value.length === 0) {
-      addSampleRecipes()
+
+  // 获取用户创建的食谱
+  const fetchUserRecipes = async (userId: string) => {
+    isLoading.value = true
+    error.value = ''
+
+    try {
+      const response = await recipeApi.getUserRecipes(userId)
+      const { data } = response as ApiResponse<Recipe[]>
+
+      // 更新食谱列表，保留收藏状态
+      const existingFavorites = new Set(recipes.value.map((r) => r.id))
+      recipes.value = data.map((recipe) => ({
+        ...recipe,
+        isFavorite: existingFavorites.has(recipe.id),
+      }))
+
+      return data
+    } catch (err: unknown) {
+      const apiError = err as ApiError
+      console.error('获取用户食谱失败:', apiError)
+      error.value = apiError.message || '获取用户食谱失败，请稍后重试'
+      return []
+    } finally {
+      isLoading.value = false
     }
   }
-  
-  /**
-   * 添加示例食谱数据
-   */
-  const addSampleRecipes = () => {
-    // 示例食谱1 - 番茄炒蛋
-    addRecipe({
-      title: '番茄炒蛋',
-      description: '简单易做的家常菜，酸甜可口，营养丰富。',
-      imageUrl: 'https://source.unsplash.com/random/300x200/?tomato-egg',
-      prepTime: 5,
-      cookTime: 10,
-      servings: 2,
-      difficulty: 'easy',
-      tags: ['快手菜', '家常菜', '低脂'],
-      category: '主食',
-      ingredients: [
-        { id: uuidv4(), name: '鸡蛋', amount: '3', unit: '个' },
-        { id: uuidv4(), name: '番茄', amount: '2', unit: '个' },
-        { id: uuidv4(), name: '盐', amount: '1/4', unit: '茶匙' },
-        { id: uuidv4(), name: '糖', amount: '1/2', unit: '茶匙' },
-        { id: uuidv4(), name: '食用油', amount: '2', unit: '汤匙' },
-        { id: uuidv4(), name: '葱花', amount: '适量', unit: '' }
-      ],
-      steps: [
-        { id: uuidv4(), description: '将鸡蛋打散，加入少许盐搅拌均匀' },
-        { id: uuidv4(), description: '番茄洗净切块' },
-        { id: uuidv4(), description: '热油锅，倒入蛋液，炒至凝固成块，盛出备用' },
-        { id: uuidv4(), description: '锅中加油，放入番茄块翻炒，加入适量糖' },
-        { id: uuidv4(), description: '番茄炒软出汁后，放入炒好的鸡蛋，大火翻炒均匀' },
-        { id: uuidv4(), description: '最后撒上葱花即可出锅' }
-      ],
-      nutrition: {
-        calories: 280,
-        protein: 15,
-        carbs: 8,
-        fat: 22
-      },
-      author: '系统'
-    })
-    
-    // 示例食谱2 - 香煎三文鱼
-    addRecipe({
-      title: '香煎三文鱼',
-      description: '简单又营养的三文鱼料理，皮酥肉嫩，富含omega-3脂肪酸。',
-      imageUrl: 'https://source.unsplash.com/random/300x200/?salmon',
-      prepTime: 5,
-      cookTime: 15,
-      servings: 2,
-      difficulty: 'medium',
-      tags: ['高蛋白', '低碳水', '海鲜'],
-      category: '主食',
-      ingredients: [
-        { id: uuidv4(), name: '三文鱼排', amount: '2', unit: '片' },
-        { id: uuidv4(), name: '盐', amount: '1/2', unit: '茶匙' },
-        { id: uuidv4(), name: '黑胡椒', amount: '1/4', unit: '茶匙' },
-        { id: uuidv4(), name: '橄榄油', amount: '1', unit: '汤匙' },
-        { id: uuidv4(), name: '柠檬', amount: '1/2', unit: '个' },
-        { id: uuidv4(), name: '迷迭香', amount: '2', unit: '枝' }
-      ],
-      steps: [
-        { id: uuidv4(), description: '三文鱼用厨房纸擦干水分，两面撒上盐和黑胡椒' },
-        { id: uuidv4(), description: '平底锅中倒入橄榄油，中高火加热' },
-        { id: uuidv4(), description: '放入三文鱼，皮朝下煎3-4分钟至酥脆' },
-        { id: uuidv4(), description: '翻面再煎2-3分钟，放入迷迭香增香' },
-        { id: uuidv4(), description: '出锅前挤上柠檬汁提味' },
-        { id: uuidv4(), description: '盛盘，可搭配蔬菜或沙拉一起食用' }
-      ],
-      nutrition: {
-        calories: 350,
-        protein: 34,
-        carbs: 2,
-        fat: 24,
-        omega3: 1.5
-      },
-      author: '系统'
-    })
-    
-    saveRecipesToLocalStorage()
+
+  // 获取用户收藏的食谱
+  const fetchFavoriteRecipes = async () => {
+    isLoading.value = true
+    error.value = ''
+
+    try {
+      const response = await recipeApi.getFavoriteRecipes()
+      const { data } = response as ApiResponse<Recipe[]>
+
+      // 更新食谱列表，设置收藏状态
+      recipes.value = data.map((recipe) => ({
+        ...recipe,
+        isFavorite: true,
+        favorites: [userStore.currentUser?.id].filter(Boolean) as string[],
+      }))
+
+      return data
+    } catch (err: unknown) {
+      const apiError = err as ApiError
+      console.error('获取收藏食谱失败:', apiError)
+      error.value = apiError.message || '获取收藏食谱失败，请稍后重试'
+      return []
+    } finally {
+      isLoading.value = false
+    }
   }
-  
-  // 初始化状态
-  initialize()
-  
-  // 返回状态和方法供组件使用
+
+  // 检查食谱是否被当前用户收藏
+  const isRecipeFavorited = (recipeId: string): boolean => {
+    if (!userStore.currentUser) return false
+    return recipes.value.some(
+      (recipe) => recipe.id === recipeId && recipe.favorites?.includes(userStore.currentUser!.id),
+    )
+  }
+
+  // 切换收藏状态
+  const toggleFavorite = async (id: string): Promise<void> => {
+    try {
+      const response = await recipeApi.toggleFavorite(id)
+      const updatedRecipe = response.data
+
+      // 更新本地缓存中的食谱
+      const index = recipes.value.findIndex((r) => r.id === id)
+      if (index !== -1) {
+        recipes.value[index] = updatedRecipe
+      }
+
+      // 如果当前正在查看这个食谱，更新它的状态
+      if (currentRecipe.value?.id === id) {
+        currentRecipe.value = updatedRecipe
+      }
+    } catch (err: unknown) {
+      const apiError = err as ApiError
+      console.error('切换收藏状态失败:', apiError)
+      error.value = apiError.message || '切换收藏状态失败，请稍后重试'
+      throw apiError
+    }
+  }
+
+  // 搜索食谱
+  const searchRecipes = async (params: Partial<SearchParams>) => {
+    await fetchAllRecipes(params)
+  }
+
+  // 重置 store 状态
+  const resetStore = () => {
+    recipes.value = []
+    currentPage.value = 1
+    totalPages.value = 1
+    totalRecipes.value = 0
+    error.value = ''
+    isLoading.value = false
+    currentRecipe.value = null
+  }
+
   return {
+    // 状态
     recipes,
-    favoriteRecipes,
-    categories,
+    isLoading,
+    error,
+    currentPage,
+    totalPages,
+    totalRecipes,
+    currentRecipe,
+
+    // 计算属性
+    popularCategories,
     popularTags,
-    getAllRecipes,
-    getFavoriteRecipes,
-    getRecommendedRecipes,
-    getFilteredRecipes,
+    categories,
+
+    // 方法
+    initialize,
+    fetchAllRecipes,
+    getRecipeById,
     addRecipe,
     updateRecipe,
     deleteRecipe,
-    toggleFavorite
+    fetchUserRecipes,
+    fetchFavoriteRecipes,
+    isRecipeFavorited,
+    toggleFavorite,
+    searchRecipes,
+    getFilteredRecipes,
+    resetStore,
   }
-}) 
+})

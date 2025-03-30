@@ -4,14 +4,49 @@
  * 功能：展示所有食谱并提供多条件筛选功能
  * 包含：搜索框、筛选面板和食谱列表展示
  */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRecipeStore } from '@/stores/recipe'
 import type { RecipeFilter } from '@/types/recipe'
+import { useRoute, useRouter } from 'vue-router'
 
 const recipeStore = useRecipeStore()
-const recipes = computed(() => recipeStore.getAllRecipes)
+const route = useRoute()
+const router = useRouter()
 
-// 筛选条件
+// 确保store初始化
+onMounted(async () => {
+  try {
+    // 清空本地缓存
+    recipeStore.resetStore()
+    // 加载所有食谱数据
+    await recipeStore.fetchAllRecipes()
+  } catch (error) {
+    console.error('加载食谱数据失败:', error)
+  }
+})
+
+// 监听路由变化，确保每次进入页面时都重新获取数据
+watch(
+  () => route.path,
+  async (newPath) => {
+    if (newPath === '/recipes') {
+      try {
+        // 清空本地缓存
+        recipeStore.resetStore()
+        // 重置筛选条件
+        resetFilter()
+        // 加载所有食谱数据
+        await recipeStore.fetchAllRecipes()
+      } catch (error) {
+        console.error('加载食谱数据失败:', error)
+      }
+    }
+  },
+  { immediate: true },
+)
+
+// 状态定义
+const currentPage = ref(1)
 const filter = ref<RecipeFilter>({
   search: '',
   category: '',
@@ -19,19 +54,18 @@ const filter = ref<RecipeFilter>({
   difficulty: undefined,
   maxPrepTime: undefined,
   maxCookTime: undefined,
-  ingredients: []
+  ingredients: [],
 })
 
 // 是否显示筛选面板
 const showFilter = ref(false)
 
+// 分类、标签和难度选项 - 用于筛选面板
+const categories = computed(() => recipeStore.categories)
+const popularTags = computed(() => recipeStore.popularTags)
+
 // 筛选后的食谱
 const filteredRecipes = computed(() => {
-  if (!filter.value.search && !filter.value.category && (!filter.value.tags || filter.value.tags.length === 0) &&
-      !filter.value.difficulty && filter.value.maxPrepTime === undefined && filter.value.maxCookTime === undefined &&
-      (!filter.value.ingredients || filter.value.ingredients.length === 0)) {
-    return recipes.value
-  }
   return recipeStore.getFilteredRecipes(filter.value)
 })
 
@@ -44,7 +78,7 @@ const resetFilter = () => {
     difficulty: undefined,
     maxPrepTime: undefined,
     maxCookTime: undefined,
-    ingredients: []
+    ingredients: [],
   }
 }
 
@@ -53,7 +87,7 @@ const toggleTag = (tag: string) => {
   if (!filter.value.tags) {
     filter.value.tags = []
   }
-  
+
   const index = filter.value.tags.indexOf(tag)
   if (index === -1) {
     filter.value.tags.push(tag)
@@ -66,36 +100,81 @@ const toggleTag = (tag: string) => {
 const addIngredient = (event: Event) => {
   const input = event.target as HTMLInputElement
   const value = input.value.trim()
-  
+
   if (!value) return
-  
+
   if (!filter.value.ingredients) {
     filter.value.ingredients = []
   }
-  
+
   if (!filter.value.ingredients.includes(value)) {
     filter.value.ingredients.push(value)
   }
-  
+
   input.value = ''
 }
 
 const removeIngredient = (ingredient: string) => {
   if (!filter.value.ingredients) return
-  
+
   const index = filter.value.ingredients.indexOf(ingredient)
   if (index !== -1) {
     filter.value.ingredients.splice(index, 1)
   }
 }
 
-const toggleFavorite = (id: string) => {
-  recipeStore.toggleFavorite(id)
+// 添加查看食谱详情方法
+const viewRecipe = (id: string) => {
+  router.push(`/recipe/${id}`)
 }
 
-// 分类、标签和难度选项 - 用于筛选面板
-const categories = recipeStore.categories;
-const popularTags = recipeStore.popularTags;
+// 添加难度文本转换方法
+const difficultyText = (difficulty: string) => {
+  switch (difficulty) {
+    case 'easy':
+      return '简单'
+    case 'medium':
+      return '中等'
+    case 'hard':
+      return '困难'
+    default:
+      return difficulty
+  }
+}
+
+// 监听筛选条件变化
+watch(
+  [
+    filter.value.search,
+    filter.value.category,
+    filter.value.tags,
+    filter.value.difficulty,
+    filter.value.maxPrepTime,
+    filter.value.maxCookTime,
+    filter.value.ingredients,
+  ],
+  async () => {
+    // 重置页码
+    currentPage.value = 1
+    // 重新加载食谱数据
+    try {
+      await recipeStore.fetchAllRecipes({
+        search: filter.value.search,
+        category: filter.value.category,
+        tags: filter.value.tags,
+        difficulty: filter.value.difficulty,
+        maxPrepTime: filter.value.maxPrepTime,
+        maxCookTime: filter.value.maxCookTime,
+        ingredients: filter.value.ingredients,
+        page: currentPage.value,
+        limit: 12,
+      })
+    } catch (error) {
+      console.error('加载食谱数据失败:', error)
+    }
+  },
+  { deep: true },
+)
 </script>
 
 <template>
@@ -103,135 +182,89 @@ const popularTags = recipeStore.popularTags;
     <div class="page-header">
       <h1>浏览食谱</h1>
       <div class="search-bar">
-        <input 
-          type="text" 
-          v-model="filter.search" 
-          placeholder="搜索食谱..." 
-          class="search-input"
-        />
+        <input type="text" v-model="filter.search" placeholder="搜索食谱..." class="search-input" />
         <button @click="showFilter = !showFilter" class="filter-toggle-btn">
           <span v-if="!showFilter">显示筛选</span>
           <span v-else>隐藏筛选</span>
         </button>
       </div>
     </div>
-    
+
     <div v-if="showFilter" class="filter-panel">
       <div class="filter-section">
         <h3>分类</h3>
         <div class="category-options">
           <label v-for="category in categories" :key="category" class="category-option">
-            <input 
-              type="radio" 
-              :value="category" 
-              v-model="filter.category" 
-              name="category"
-            />
+            <input type="radio" :value="category" v-model="filter.category" name="category" />
             <span>{{ category }}</span>
           </label>
           <label class="category-option">
-            <input 
-              type="radio" 
-              value="" 
-              v-model="filter.category" 
-              name="category"
-            />
+            <input type="radio" value="" v-model="filter.category" name="category" />
             <span>全部</span>
           </label>
         </div>
       </div>
-      
+
       <div class="filter-section">
         <h3>标签</h3>
         <div class="tag-options">
-          <span 
-            v-for="tag in popularTags" 
+          <span
+            v-for="tag in popularTags"
             :key="tag"
             @click="toggleTag(tag)"
-            :class="['tag', { 'active': filter.tags?.includes(tag) }]"
+            :class="['tag', { active: filter.tags?.includes(tag) }]"
           >
             {{ tag }}
           </span>
         </div>
       </div>
-      
+
       <div class="filter-section">
         <h3>难度</h3>
         <div class="difficulty-options">
           <label class="difficulty-option">
-            <input 
-              type="radio" 
-              value="easy" 
-              v-model="filter.difficulty" 
-              name="difficulty"
-            />
+            <input type="radio" value="easy" v-model="filter.difficulty" name="difficulty" />
             <span>简单</span>
           </label>
           <label class="difficulty-option">
-            <input 
-              type="radio" 
-              value="medium" 
-              v-model="filter.difficulty" 
-              name="difficulty"
-            />
+            <input type="radio" value="medium" v-model="filter.difficulty" name="difficulty" />
             <span>中等</span>
           </label>
           <label class="difficulty-option">
-            <input 
-              type="radio" 
-              value="hard" 
-              v-model="filter.difficulty" 
-              name="difficulty"
-            />
+            <input type="radio" value="hard" v-model="filter.difficulty" name="difficulty" />
             <span>困难</span>
           </label>
           <label class="difficulty-option">
-            <input 
-              type="radio" 
-              :value="undefined" 
-              v-model="filter.difficulty" 
-              name="difficulty"
-            />
+            <input type="radio" :value="undefined" v-model="filter.difficulty" name="difficulty" />
             <span>全部</span>
           </label>
         </div>
       </div>
-      
+
       <div class="filter-section time-section">
         <div class="time-filter">
           <h3>最长准备时间（分钟）</h3>
-          <input 
-            type="number" 
-            v-model="filter.maxPrepTime" 
-            min="0" 
-            placeholder="不限"
-          />
+          <input type="number" v-model="filter.maxPrepTime" min="0" placeholder="不限" />
         </div>
-        
+
         <div class="time-filter">
           <h3>最长烹饪时间（分钟）</h3>
-          <input 
-            type="number" 
-            v-model="filter.maxCookTime" 
-            min="0" 
-            placeholder="不限"
-          />
+          <input type="number" v-model="filter.maxCookTime" min="0" placeholder="不限" />
         </div>
       </div>
-      
+
       <div class="filter-section">
         <h3>包含的食材</h3>
         <div class="ingredients-input">
-          <input 
-            type="text" 
-            placeholder="输入食材名称"
-            @keyup.enter="addIngredient($event)"
-          />
+          <input type="text" placeholder="输入食材名称" @keyup.enter="addIngredient($event)" />
           <button @click="addIngredient($event)">添加</button>
         </div>
-        <div v-if="filter.ingredients && filter.ingredients.length > 0" class="selected-ingredients">
-          <span 
-            v-for="ingredient in filter.ingredients" 
+        <div
+          v-if="filter.ingredients && filter.ingredients.length > 0"
+          class="selected-ingredients"
+        >
+          <span
+            v-for="ingredient in filter.ingredients"
             :key="ingredient"
             class="selected-ingredient"
           >
@@ -240,36 +273,38 @@ const popularTags = recipeStore.popularTags;
           </span>
         </div>
       </div>
-      
+
       <div class="filter-actions">
         <button @click="resetFilter" class="reset-btn">重置筛选</button>
       </div>
     </div>
-    
+
     <div class="recipes-container">
-      <div v-if="filteredRecipes.length === 0" class="no-recipes">
+      <div v-if="recipeStore.isLoading" class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>加载中...</p>
+      </div>
+      <div v-else-if="filteredRecipes.length === 0" class="no-recipes">
         <p>未找到符合条件的食谱</p>
       </div>
       <div v-else class="recipe-cards">
-        <div v-for="recipe in filteredRecipes" :key="recipe.id" class="recipe-card">
-          <div class="recipe-image" :style="{ backgroundImage: `url(${recipe.imageUrl})` }">
-            <button @click="toggleFavorite(recipe.id)" class="favorite-btn">
-              <span v-if="recipe.isFavorite">❤️</span>
-              <span v-else>🤍</span>
-            </button>
+        <div
+          v-for="recipe in filteredRecipes"
+          :key="recipe.id"
+          class="recipe-card"
+          @click="viewRecipe(recipe.id)"
+        >
+          <div class="recipe-image-container">
+            <img :src="recipe.image" :alt="recipe.title" class="recipe-image" />
           </div>
           <div class="recipe-content">
             <h3>{{ recipe.title }}</h3>
-            <p class="recipe-description">{{ recipe.description }}</p>
+            <p>{{ recipe.description }}</p>
             <div class="recipe-meta">
-              <span class="prep-time">准备：{{ recipe.prepTime }}分钟</span>
-              <span class="cook-time">烹饪：{{ recipe.cookTime }}分钟</span>
-            </div>
-            <div class="recipe-tags">
-              <span v-for="tag in recipe.tags" :key="tag" class="recipe-tag">{{ tag }}</span>
-            </div>
-            <div class="recipe-actions">
-              <router-link :to="`/recipe/${recipe.id}`" class="view-recipe-btn">查看详情</router-link>
+              <span class="cook-time">
+                <i class="fa-solid fa-clock"></i> {{ recipe.cookTime }}分钟
+              </span>
+              <span class="difficulty">{{ difficultyText(recipe.difficulty) }}</span>
             </div>
           </div>
         </div>
@@ -342,13 +377,15 @@ const popularTags = recipeStore.popularTags;
   color: var(--text-color);
 }
 
-.category-options, .difficulty-options {
+.category-options,
+.difficulty-options {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem;
 }
 
-.category-option, .difficulty-option {
+.category-option,
+.difficulty-option {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -466,6 +503,34 @@ const popularTags = recipeStore.popularTags;
   margin-top: 2rem;
 }
 
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 0;
+  color: #666;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 .no-recipes {
   text-align: center;
   padding: 3rem 0;
@@ -491,22 +556,23 @@ const popularTags = recipeStore.popularTags;
   box-shadow: 0 8px 16px rgba(0, 0, 0, 0.12);
 }
 
-.recipe-image {
-  height: 200px;
-  background-size: cover;
-  background-position: center;
+.recipe-image-container {
   position: relative;
+  width: 100%;
+  height: 200px;
+  overflow: hidden;
+  border-radius: 8px 8px 0 0;
 }
 
-.favorite-btn {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.3));
+.recipe-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.recipe-card:hover .recipe-image {
+  transform: scale(1.05);
 }
 
 .recipe-content {
@@ -577,9 +643,9 @@ const popularTags = recipeStore.popularTags;
     flex-direction: column;
     gap: 1rem;
   }
-  
+
   .recipe-cards {
     grid-template-columns: 1fr;
   }
 }
-</style> 
+</style>
