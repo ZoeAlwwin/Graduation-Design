@@ -8,26 +8,38 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { useRouter } from 'vue-router'
 import type { User } from '@/stores/user'
+import { ElUpload, ElButton } from 'element-plus'
 
 const router = useRouter()
 const userStore = useUserStore()
 
 // 初始化用户存储
-onMounted(() => {
-  userStore.initialize()
+onMounted(async () => {
+  // 强制从后端重新获取当前用户数据
+  try {
+    // 检查登录状态
+    if (!userStore.isLoggedIn) {
+      router.push('/login')
+      return
+    }
 
-  // 如果未登录，重定向到登录页面
-  if (!userStore.isLoggedIn) {
-    router.push('/login')
-    return
-  }
+    // 从API获取最新的用户数据
+    await userStore.initialize()
 
-  // 用当前用户数据初始化表单
-  if (userStore.currentUser) {
+    // 确保数据已加载
+    if (!userStore.currentUser) {
+      router.push('/login')
+      return
+    }
+
+    // 用最新的用户数据初始化表单
     formData.username = userStore.currentUser.username
     formData.email = userStore.currentUser.email
     formData.bio = userStore.currentUser.bio || ''
     formData.avatar = userStore.currentUser.avatar
+  } catch (error: unknown) {
+    console.error('获取用户数据失败:', error)
+    router.push('/login')
   }
 })
 
@@ -115,7 +127,7 @@ const validateForm = () => {
 }
 
 // 保存用户资料
-const saveProfile = () => {
+const saveProfile = async () => {
   if (!validateForm()) return
 
   isSubmitting.value = true
@@ -129,20 +141,48 @@ const saveProfile = () => {
   }
 
   // 调用更新方法
-  const success = userStore.updateProfile(updateData)
+  try {
+    const success = await userStore.updateProfile(updateData)
 
-  isSubmitting.value = false
-
-  if (success) {
-    isEditing.value = false
-    successMessage.value = '个人资料已成功更新！'
+    if (success) {
+      isEditing.value = false
+      successMessage.value = '个人资料已成功更新！'
+    }
+  } catch (error: unknown) {
+    console.error('更新资料失败:', error)
+  } finally {
+    isSubmitting.value = false
   }
 }
 
-// 更换随机头像
-const changeRandomAvatar = () => {
-  const timestamp = new Date().getTime()
-  formData.avatar = `https://source.unsplash.com/random/200x200/?portrait&t=${timestamp}`
+// 处理头像上传
+interface UploadFile {
+  raw: File
+}
+
+// 处理头像上传
+const handleAvatarChange = (file: UploadFile) => {
+  // 验证文件类型
+  if (!file.raw.type.startsWith('image/')) {
+    errors.avatar = '请上传图片文件'
+    return
+  }
+
+  // 验证文件大小（限制为5MB）
+  if (file.raw.size > 5 * 1024 * 1024) {
+    errors.avatar = '图片大小不能超过5MB'
+    return
+  }
+
+  // 清除错误信息
+  errors.avatar = ''
+
+  // 创建预览URL
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    formData.avatar = e.target?.result as string
+  }
+  reader.readAsDataURL(file.raw)
 }
 
 // 格式化日期
@@ -172,25 +212,25 @@ const formatDate = (dateString: string) => {
               :alt="currentUser.username"
               class="profile-avatar"
             />
-            <button
-              v-if="isEditing"
-              @click="changeRandomAvatar"
-              class="change-avatar-btn"
-              title="更换随机头像"
-            >
-              🔄
-            </button>
+            <div v-if="isEditing" class="avatar-upload">
+              <ElUpload
+                class="avatar-uploader"
+                action="#"
+                :show-file-list="false"
+                :auto-upload="false"
+                accept="image/*"
+                :on-change="handleAvatarChange"
+              >
+                <ElButton type="primary" class="change-avatar-btn">
+                  <i class="el-icon-upload"></i> 更换头像
+                </ElButton>
+              </ElUpload>
+            </div>
           </div>
 
-          <div v-if="isEditing" class="avatar-url-input">
-            <label for="avatar">头像链接</label>
-            <input
-              type="text"
-              id="avatar"
-              v-model="formData.avatar"
-              placeholder="请输入头像图片链接"
-            />
-            <p v-if="errors.avatar" class="error-text">{{ errors.avatar }}</p>
+          <div v-if="isEditing" class="avatar-preview" v-show="formData.avatar">
+            <p class="preview-text">头像预览</p>
+            <img :src="formData.avatar" alt="头像预览" class="preview-image" />
           </div>
         </div>
 
@@ -317,34 +357,50 @@ const formatDate = (dateString: string) => {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 
-.change-avatar-btn {
+.avatar-upload {
   position: absolute;
   bottom: 0;
   right: 0;
-  background-color: var(--primary-color);
-  color: white;
-  border: none;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  z-index: 2;
+}
+
+.change-avatar-btn {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 4px;
+  background-color: var(--primary-color);
+  border: none;
+  color: white;
   cursor: pointer;
-  font-size: 1.1rem;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-  transition: var(--transition);
+  transition: all 0.3s ease;
 }
 
 .change-avatar-btn:hover {
-  background-color: #ff5252;
-  transform: scale(1.05);
+  background-color: #66b1ff;
+  transform: translateY(-1px);
 }
 
-.avatar-url-input {
-  width: 100%;
-  max-width: 400px;
+.avatar-preview {
   margin-top: 1rem;
+  text-align: center;
+}
+
+.preview-text {
+  font-size: 0.9rem;
+  color: #606266;
+  margin-bottom: 0.5rem;
+}
+
+.preview-image {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .profile-info-section {

@@ -223,21 +223,37 @@ export const useRecipeStore = defineStore('recipe', () => {
       return null
     }
 
+    console.log('开始查找食谱，ID:', id)
+
     // 先从本地缓存查找
     const cachedRecipe = recipes.value.find((r) => r.id === id)
     if (cachedRecipe) {
+      console.log('从缓存中找到食谱:', cachedRecipe.title)
       return cachedRecipe
     }
+
+    console.log('本地缓存中未找到食谱，从API获取')
 
     // 如果本地没有，从API获取
     isLoading.value = true
     error.value = ''
 
     try {
+      // 发起API请求前，记录当前状态
+      console.log('发起API请求，获取食谱:', id)
       const response = await recipeApi.getRecipe(id)
+      console.log('API响应:', response)
+
+      // 确保响应中包含数据
+      if (!response || !response.data) {
+        console.error('API响应中不包含数据')
+        return null
+      }
+
       const recipe = response.data
 
       // 添加到本地缓存
+      console.log('将食谱添加到缓存:', recipe.title)
       const existingIndex = recipes.value.findIndex((r) => r.id === recipe.id)
       if (existingIndex === -1) {
         recipes.value.push(recipe)
@@ -363,14 +379,15 @@ export const useRecipeStore = defineStore('recipe', () => {
       const response = await recipeApi.getFavoriteRecipes()
       const { data } = response as ApiResponse<Recipe[]>
 
-      // 更新食谱列表，设置收藏状态
-      recipes.value = data.map((recipe) => ({
+      // 不修改全局 recipes 数组，只返回收藏的食谱数据
+      // 为每个食谱设置收藏状态
+      const favoriteRecipes = data.map((recipe) => ({
         ...recipe,
         isFavorite: true,
         favorites: [userStore.currentUser?.id].filter(Boolean) as string[],
       }))
 
-      return data
+      return favoriteRecipes
     } catch (err: unknown) {
       const apiError = err as ApiError
       console.error('获取收藏食谱失败:', apiError)
@@ -384,9 +401,17 @@ export const useRecipeStore = defineStore('recipe', () => {
   // 检查食谱是否被当前用户收藏
   const isRecipeFavorited = (recipeId: string): boolean => {
     if (!userStore.currentUser) return false
-    return recipes.value.some(
-      (recipe) => recipe.id === recipeId && recipe.favorites?.includes(userStore.currentUser!.id),
-    )
+
+    // 首先在本地缓存中检查
+    const recipe = recipes.value.find((r) => r.id === recipeId)
+    if (recipe && recipe.favorites) {
+      const userId = userStore.currentUser.id
+      return recipe.favorites.includes(userId)
+    }
+
+    // 如果本地缓存中没有找到，默认为false
+    console.log(`未能在本地缓存中找到食谱(${recipeId})的收藏状态`)
+    return false
   }
 
   // 切换收藏状态
@@ -420,13 +445,20 @@ export const useRecipeStore = defineStore('recipe', () => {
 
   // 重置 store 状态
   const resetStore = () => {
+    // 完全清空食谱数组，确保不会保留来自"我的食谱"页面的食谱
     recipes.value = []
+    // 重置分页信息
     currentPage.value = 1
     totalPages.value = 1
     totalRecipes.value = 0
+    // 重置错误和加载状态
     error.value = ''
     isLoading.value = false
+    // 重置当前查看的食谱
     currentRecipe.value = null
+
+    // 确保控制台记录重置操作，方便调试
+    console.log('Recipe store has been reset')
   }
 
   return {

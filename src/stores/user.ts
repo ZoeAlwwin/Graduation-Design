@@ -35,6 +35,8 @@ export const useUserStore = defineStore('user', () => {
   const registerError = ref('')
   const isInitialized = ref(false)
   const isLoading = ref(false)
+  const viewHistory = ref<string[]>([])
+  const MAX_HISTORY_SIZE = 20 // 限制历史记录大小
 
   // 初始化用户数据
   const initialize = async () => {
@@ -49,6 +51,8 @@ export const useUserStore = defineStore('user', () => {
         // 从后端获取当前用户信息
         const response = await userApi.getCurrentUser()
         currentUser.value = response.user
+        // 加载用户浏览历史
+        loadViewHistory()
       }
     } catch (error) {
       console.error('初始化用户数据失败:', error)
@@ -143,6 +147,59 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
+  // 添加食谱到浏览历史
+  const addToViewHistory = (recipeId: string) => {
+    // 如果已经在最近浏览的列表中，先移除它
+    const index = viewHistory.value.indexOf(recipeId)
+    if (index !== -1) {
+      viewHistory.value.splice(index, 1)
+    }
+
+    // 添加到历史记录开头（最新浏览的排在最前面）
+    viewHistory.value.unshift(recipeId)
+
+    // 限制历史记录大小
+    if (viewHistory.value.length > MAX_HISTORY_SIZE) {
+      viewHistory.value = viewHistory.value.slice(0, MAX_HISTORY_SIZE)
+    }
+
+    // 保存到本地存储
+    if (isLoggedIn.value && currentUser.value) {
+      localStorage.setItem(
+        `user_view_history_${currentUser.value.id}`,
+        JSON.stringify(viewHistory.value),
+      )
+    }
+  }
+
+  // 获取浏览历史
+  const getViewHistory = () => {
+    return viewHistory.value
+  }
+
+  // 清除浏览历史
+  const clearViewHistory = () => {
+    viewHistory.value = []
+    if (isLoggedIn.value && currentUser.value) {
+      localStorage.removeItem(`user_view_history_${currentUser.value.id}`)
+    }
+  }
+
+  // 初始化时加载浏览历史
+  const loadViewHistory = () => {
+    if (isLoggedIn.value && currentUser.value) {
+      const historyData = localStorage.getItem(`user_view_history_${currentUser.value.id}`)
+      if (historyData) {
+        try {
+          viewHistory.value = JSON.parse(historyData)
+        } catch (error: unknown) {
+          console.error('Failed to parse view history:', error)
+          viewHistory.value = []
+        }
+      }
+    }
+  }
+
   return {
     // 状态
     currentUser,
@@ -151,6 +208,7 @@ export const useUserStore = defineStore('user', () => {
     registerError,
     isInitialized,
     isLoading,
+    viewHistory,
 
     // 方法
     initialize,
@@ -159,5 +217,8 @@ export const useUserStore = defineStore('user', () => {
     logout,
     updateProfile,
     changePassword,
+    addToViewHistory,
+    getViewHistory,
+    clearViewHistory,
   }
 })

@@ -4,7 +4,7 @@
  * 功能：展示所有食谱并提供多条件筛选功能
  * 包含：搜索框、筛选面板和食谱列表展示
  */
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, onActivated } from 'vue'
 import { useRecipeStore } from '@/stores/recipe'
 import type { RecipeFilter } from '@/types/recipe'
 import { useRoute, useRouter } from 'vue-router'
@@ -13,32 +13,61 @@ const recipeStore = useRecipeStore()
 const route = useRoute()
 const router = useRouter()
 
-// 确保store初始化
-onMounted(async () => {
+// 重新加载所有食谱数据的函数
+const reloadAllRecipes = async () => {
   try {
+    console.log('开始重新加载所有食谱数据')
     // 清空本地缓存
     recipeStore.resetStore()
+    // 重置筛选条件
+    resetFilter()
     // 加载所有食谱数据
     await recipeStore.fetchAllRecipes()
+    console.log('成功重新加载所有食谱数据，共加载', recipeStore.recipes.length, '条食谱')
   } catch (error) {
     console.error('加载食谱数据失败:', error)
   }
+}
+
+// 使用组合式API的activated钩子，确保页面激活时重新加载
+onMounted(async () => {
+  console.log('RecipesView 组件挂载，重新加载数据')
+  await reloadAllRecipes()
+})
+
+// 在组件激活时也重新获取数据
+const isFirstActivation = ref(true)
+onActivated(async () => {
+  if (isFirstActivation.value) {
+    isFirstActivation.value = false
+    return
+  }
+
+  console.log('RecipesView 组件激活，重新加载数据')
+  await reloadAllRecipes()
 })
 
 // 监听路由变化，确保每次进入页面时都重新获取数据
 watch(
   () => route.path,
-  async (newPath) => {
+  async (newPath, oldPath) => {
     if (newPath === '/recipes') {
-      try {
-        // 清空本地缓存
-        recipeStore.resetStore()
-        // 重置筛选条件
-        resetFilter()
-        // 加载所有食谱数据
-        await recipeStore.fetchAllRecipes()
-      } catch (error) {
-        console.error('加载食谱数据失败:', error)
+      // 如果是从其他页面（非浏览食谱）切换过来的，强制重新加载
+      if (oldPath !== '/recipes') {
+        await reloadAllRecipes()
+      }
+    }
+  },
+)
+
+// 添加额外的监听器，确保从"我的食谱"页面过来时重新加载
+watch(
+  () => route.fullPath,
+  async (newPath) => {
+    if (newPath.includes('/recipes')) {
+      // 检查store中当前的食谱是否可能是从"我的食谱"页面加载的
+      if (recipeStore.recipes.length > 0 && recipeStore.recipes.every((r) => r.isFavorite)) {
+        await reloadAllRecipes()
       }
     }
   },

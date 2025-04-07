@@ -7,12 +7,15 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRecipeStore } from '@/stores/recipe'
+import { useUserStore } from '@/stores/user'
+import { getRecommendedRecipes, getPersonalizedRecommendations } from '@/utils/recommendationEngine'
 import type { Recipe } from '@/types/recipe'
 
 // 引入路由和食谱存储
 const route = useRoute()
 const router = useRouter()
 const recipeStore = useRecipeStore()
+const userStore = useUserStore()
 
 // 状态定义 - 管理页面数据
 const loading = ref(true)
@@ -31,7 +34,17 @@ const loadRecipe = async () => {
     const recipeData = await recipeStore.getRecipeById(recipeId.value)
 
     if (recipeData) {
+      // 确保正确设置isFavorite状态
       recipe.value = recipeData
+
+      // 双重检查收藏状态
+      if (recipe.value && typeof recipe.value.isFavorite === 'undefined') {
+        recipe.value.isFavorite = recipeStore.isRecipeFavorited(recipe.value.id)
+        console.log('初始化收藏状态:', recipe.value.isFavorite ? '已收藏' : '未收藏')
+      }
+
+      // 记录浏览历史，用于AI推荐
+      userStore.addToViewHistory(recipeData.id)
     } else {
       // 食谱不存在，跳转到食谱列表
       router.push('/recipes')
@@ -70,9 +83,17 @@ onMounted(() => {
 const toggleFavorite = async () => {
   if (recipe.value) {
     try {
+      // 调用 API 切换收藏状态
       await recipeStore.toggleFavorite(recipe.value.id)
-      // 更新本地收藏状态
-      recipe.value.isFavorite = !recipe.value.isFavorite
+
+      // 使用 API 返回的最新数据来更新食谱状态
+      // 重新获取最新的食谱数据
+      const updatedRecipe = await recipeStore.getRecipeById(recipe.value.id)
+      if (updatedRecipe) {
+        recipe.value = updatedRecipe
+      }
+
+      console.log('收藏状态已更新:', recipe.value.isFavorite ? '已收藏' : '未收藏')
     } catch (error) {
       console.error('收藏操作失败:', error)
     }
@@ -110,11 +131,28 @@ const difficultyText = computed(() => {
  */
 const relatedRecipes = computed(() => {
   if (!recipe.value) return []
-  // 使用 getFilteredRecipes 获取同分类的食谱作为推荐
-  return recipeStore
-    .getFilteredRecipes({ category: recipe.value.category[0] })
-    .filter((r) => r.id !== recipe.value?.id)
-    .slice(0, 3)
+
+  // 使用AI推荐引擎获取推荐
+  // 如果用户有浏览历史，则使用个性化推荐，否则使用基于当前食谱的相似内容推荐
+  const userViewHistory = userStore.getViewHistory()
+  const allRecipes = recipeStore.recipes
+
+  // 从浏览历史中获取对应的食谱对象
+  const viewedRecipes = userViewHistory
+    .map((id) => allRecipes.find((r) => r.id === id))
+    .filter(Boolean) as Recipe[]
+
+  return viewedRecipes.length > 2
+    ? getPersonalizedRecommendations(viewedRecipes, allRecipes, 3)
+    : getRecommendedRecipes(recipe.value, allRecipes, 3)
+})
+
+// 判断推荐类型
+const isPersonalized = computed(() => {
+  const userViewHistory = userStore.getViewHistory()
+  const viewedRecipes = recipeStore.recipes.filter((r) => userViewHistory.includes(r.id))
+
+  return viewedRecipes.length > 2
 })
 
 /**
@@ -172,9 +210,14 @@ const goBack = () => {
         <div class="recipe-title-container">
           <h1>{{ recipe.title }}</h1>
           <div class="recipe-actions">
-            <button @click="toggleFavorite" class="action-btn favorite-btn">
+            <button
+              @click="toggleFavorite"
+              class="action-btn favorite-btn"
+              :class="{ 'is-favorite': recipe.isFavorite }"
+            >
               <i
-                :class="['fa-solid', recipe.isFavorite ? 'fa-heart' : 'fa-heart']"
+                class="fa-heart"
+                :class="recipe.isFavorite ? 'fa-solid' : 'fa-regular'"
                 :style="{ color: recipe.isFavorite ? '#ff4444' : '#666' }"
               ></i>
               <span>{{ recipe.isFavorite ? '已收藏' : '收藏' }}</span>
@@ -281,11 +324,15 @@ const goBack = () => {
 
         <div class="related-recipes">
           <h3>您可能还喜欢</h3>
+          <p class="ai-recommendation-note">
+            {{ isPersonalized ? '基于您的浏览历史，AI为您推荐' : '基于相似内容，AI为您推荐' }}
+          </p>
           <div class="related-recipe-cards">
             <div
               v-for="relatedRecipe in relatedRecipes"
               :key="relatedRecipe.id"
               class="related-recipe-card"
+              :title="`基于相似内容推荐`"
             >
               <div
                 class="related-recipe-image"
@@ -293,6 +340,14 @@ const goBack = () => {
               ></div>
               <div class="related-recipe-content">
                 <h4>{{ relatedRecipe.title }}</h4>
+                <div class="related-recipe-tags">
+                  <span v-if="relatedRecipe.category.length > 0" class="related-tag">{{
+                    relatedRecipe.category[0]
+                  }}</span>
+                  <span v-if="relatedRecipe.tags.length > 0" class="related-tag">{{
+                    relatedRecipe.tags[0]
+                  }}</span>
+                </div>
                 <router-link :to="`/recipe/${relatedRecipe.id}`" class="view-related-btn"
                   >查看</router-link
                 >
@@ -385,6 +440,12 @@ const goBack = () => {
 
 .favorite-btn {
   color: var(--primary-color);
+  transition: all 0.3s ease;
+}
+
+.favorite-btn.is-favorite {
+  background-color: #fff0f0;
+  border-color: #ffcccc;
 }
 
 .favorite-btn i {
@@ -590,56 +651,98 @@ h2 {
   margin: 0.25rem 0;
 }
 
+.related-recipes {
+  margin-top: 3rem;
+  border-top: 1px solid var(--border-color);
+  padding-top: 2rem;
+}
+
 .related-recipes h3 {
-  margin-top: 0;
-  margin-bottom: 1rem;
-  font-size: 1.25rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.5rem;
   color: var(--text-color);
+}
+
+.ai-recommendation-note {
+  color: #888;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+  font-style: italic;
 }
 
 .related-recipe-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1.5rem;
+  margin-top: 1rem;
 }
 
 .related-recipe-card {
-  background-color: #f9f9f9;
+  background-color: white;
   border-radius: 8px;
   overflow: hidden;
-  transition: var(--transition);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition:
+    transform 0.3s,
+    box-shadow 0.3s;
 }
 
 .related-recipe-card:hover {
-  transform: translateY(-5px);
-  box-shadow: var(--shadow);
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .related-recipe-image {
-  height: 150px;
+  height: 160px;
   background-size: cover;
   background-position: center;
 }
 
 .related-recipe-content {
   padding: 1rem;
+  position: relative;
 }
 
 .related-recipe-content h4 {
-  margin-top: 0;
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  color: var(--text-color);
+  height: 2.4em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.related-recipe-tags {
+  display: flex;
+  gap: 0.5rem;
   margin-bottom: 0.75rem;
-  font-size: 1rem;
+  flex-wrap: wrap;
+}
+
+.related-tag {
+  background-color: #f0f0f0;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: #666;
+  max-width: 100px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .view-related-btn {
   display: inline-block;
-  padding: 0.25rem 0.75rem;
+  padding: 0.4rem 1rem;
   background-color: var(--primary-color);
   color: white;
   text-decoration: none;
   border-radius: 4px;
-  font-size: 0.875rem;
-  transition: var(--transition);
+  font-size: 0.9rem;
+  transition: background-color 0.3s;
 }
 
 .view-related-btn:hover {

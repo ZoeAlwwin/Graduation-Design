@@ -30,7 +30,7 @@ export const createTestData = async (): Promise<void> => {
     const recipes = [
       {
         title: '红烧肉',
-        description: '经典的中式红烧肉，肥而不腻，香甜可口。',
+        description: '经典的中国菜，红烧肉是一道色香味俱全的传统名菜',
         ingredients: [
           '五花肉 500克',
           '生姜 2片',
@@ -55,8 +55,7 @@ export const createTestData = async (): Promise<void> => {
         cuisine: '中式',
         category: ['肉类', '红烧'],
         tags: ['猪肉', '家常菜', '下饭菜'],
-        image:
-          'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=60',
+        image: 'https://t7.baidu.com/it/u=2994861304,797457043&fm=193&f=GIF',
         nutrition: {
           calories: 450,
           fat: 30,
@@ -68,7 +67,7 @@ export const createTestData = async (): Promise<void> => {
       },
       {
         title: '番茄炒蛋',
-        description: '简单美味的家常菜，酸甜可口，老少皆宜。',
+        description: '家常菜中的经典，酸甜可口的番茄搭配嫩滑的鸡蛋',
         ingredients: ['西红柿 2个', '鸡蛋 3个', '葱花 适量', '盐 适量', '糖 1小勺', '食用油 适量'],
         steps: [
           '西红柿洗净切块，鸡蛋打散',
@@ -85,8 +84,7 @@ export const createTestData = async (): Promise<void> => {
         cuisine: '中式',
         category: ['家常菜', '快手菜'],
         tags: ['鸡蛋', '西红柿', '10分钟'],
-        image:
-          'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800&auto=format&fit=crop&q=60',
+        image: 'https://t7.baidu.com/it/u=3576050513,3941606487&fm=193&f=GIF',
         nutrition: {
           calories: 180,
           fat: 12,
@@ -98,7 +96,7 @@ export const createTestData = async (): Promise<void> => {
       },
       {
         title: '宫保鸡丁',
-        description: '四川名菜，鸡肉和花生的完美结合，麻辣鲜香。',
+        description: '川菜代表，鸡肉与花生的完美结合，麻辣鲜香',
         ingredients: [
           '鸡胸肉 300克',
           '黄瓜 半根',
@@ -127,8 +125,7 @@ export const createTestData = async (): Promise<void> => {
         cuisine: '川菜',
         category: ['家常菜', '炒菜'],
         tags: ['鸡肉', '辣', '下饭'],
-        image:
-          'https://images.unsplash.com/photo-1525755662778-989d0524087e?w=800&auto=format&fit=crop&q=60',
+        image: 'https://t7.baidu.com/it/u=3607339404,2522331297&fm=193&f=GIF',
         nutrition: {
           calories: 320,
           fat: 18,
@@ -140,7 +137,7 @@ export const createTestData = async (): Promise<void> => {
       },
       {
         title: '水煮鱼',
-        description: '四川传统名菜，麻辣鲜香，让人回味无穷。',
+        description: '四川传统名菜，鲜嫩的鱼肉配以麻辣的汤底',
         ingredients: [
           '草鱼 1条（约500克）',
           '豆芽 200克',
@@ -169,8 +166,7 @@ export const createTestData = async (): Promise<void> => {
         cuisine: '川菜',
         category: ['家常菜', '水煮'],
         tags: ['鱼', '麻辣', '下饭'],
-        image:
-          'https://images.unsplash.com/photo-1511176118080-4a856f029ca3?w=800&auto=format&fit=crop&q=60',
+        image: 'https://t7.baidu.com/it/u=1966530184,1817645497&fm=193&f=GIF',
         nutrition: {
           calories: 280,
           fat: 14,
@@ -182,7 +178,7 @@ export const createTestData = async (): Promise<void> => {
       },
       {
         title: '糖醋排骨',
-        description: '外酥里嫩，酸甜可口的传统名菜。',
+        description: '色泽红亮，酸甜可口，肉质酥烂的传统名菜',
         ingredients: [
           '猪小排 500克',
           '白醋 2勺',
@@ -210,8 +206,7 @@ export const createTestData = async (): Promise<void> => {
         cuisine: '中式',
         category: ['肉类', '糖醋'],
         tags: ['排骨', '酸甜', '下饭'],
-        image:
-          'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=60',
+        image: 'https://t7.baidu.com/it/u=3691080281,3570428073&fm=193&f=GIF',
         nutrition: {
           calories: 420,
           fat: 28,
@@ -223,7 +218,7 @@ export const createTestData = async (): Promise<void> => {
       },
       {
         title: '麻婆豆腐',
-        description: '四川传统名菜，麻辣鲜香，豆腐嫩滑。',
+        description: '四川传统名菜，麻辣鲜香，豆腐嫩滑，肉末鲜香',
         ingredients: [
           '豆腐 1盒',
           '猪肉末 100克',
@@ -252,8 +247,7 @@ export const createTestData = async (): Promise<void> => {
         cuisine: '川菜',
         category: ['家常菜', '烩菜'],
         tags: ['豆腐', '麻辣', '下饭'],
-        image:
-          'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800&auto=format&fit=crop&q=60',
+        image: 'https://t7.baidu.com/it/u=1662707474,888802400&fm=193&f=GIF',
         nutrition: {
           calories: 220,
           fat: 15,
@@ -265,7 +259,7 @@ export const createTestData = async (): Promise<void> => {
       },
       {
         title: '鱼香肉丝',
-        description: '川菜经典，酸甜辣咸完美结合。',
+        description: '川菜代表菜肴，以鱼香味调味而得名，实际不含鱼',
         ingredients: [
           '猪里脊肉 300克',
           '胡萝卜 半根',
@@ -296,8 +290,7 @@ export const createTestData = async (): Promise<void> => {
         cuisine: '川菜',
         category: ['家常菜', '炒菜'],
         tags: ['猪肉', '酸辣', '下饭'],
-        image:
-          'https://images.unsplash.com/photo-1525755662778-989d0524087e?w=800&auto=format&fit=crop&q=60',
+        image: 'https://t7.baidu.com/it/u=2336382474,3214272358&fm=193&f=GIF',
         nutrition: {
           calories: 280,
           fat: 16,
@@ -309,7 +302,7 @@ export const createTestData = async (): Promise<void> => {
       },
       {
         title: '清蒸鲈鱼',
-        description: '鲜美清淡，保留食材原味的健康菜品。',
+        description: '保留了鱼的原汁原味，肉质鲜嫩细滑',
         ingredients: [
           '鲈鱼 1条（约500克）',
           '姜片 5片',
@@ -336,8 +329,7 @@ export const createTestData = async (): Promise<void> => {
         cuisine: '粤菜',
         category: ['家常菜', '蒸菜'],
         tags: ['鱼', '清淡', '健康'],
-        image:
-          'https://images.unsplash.com/photo-1511176118080-4a856f029ca3?w=800&auto=format&fit=crop&q=60',
+        image: 'https://t7.baidu.com/it/u=2901570979,2181628211&fm=193&f=GIF',
         nutrition: {
           calories: 220,
           fat: 10,
@@ -349,7 +341,7 @@ export const createTestData = async (): Promise<void> => {
       },
       {
         title: '西红柿牛腩汤',
-        description: '营养丰富，酸甜开胃的家常汤品。',
+        description: '酸甜可口，牛腩软烂，营养丰富',
         ingredients: [
           '牛腩 300克',
           '西红柿 2个',
@@ -381,8 +373,7 @@ export const createTestData = async (): Promise<void> => {
         cuisine: '中式',
         category: ['汤品', '炖菜'],
         tags: ['牛肉', '番茄', '暖胃'],
-        image:
-          'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&auto=format&fit=crop&q=60',
+        image: 'https://t7.baidu.com/it/u=376303577,1710201594&fm=193&f=GIF',
         nutrition: {
           calories: 320,
           fat: 12,
@@ -394,7 +385,7 @@ export const createTestData = async (): Promise<void> => {
       },
       {
         title: '蒜蓉蒸虾',
-        description: '鲜美多汁，蒜香四溢的海鲜佳肴。',
+        description: '鲜美的虾肉配以蒜蓉，鲜香可口',
         ingredients: [
           '鲜虾 500克',
           '蒜末 3勺',
@@ -419,8 +410,7 @@ export const createTestData = async (): Promise<void> => {
         cuisine: '粤菜',
         category: ['海鲜', '蒸菜'],
         tags: ['虾', '蒜香', '鲜美'],
-        image:
-          'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800&auto=format&fit=crop&q=60',
+        image: 'https://t7.baidu.com/it/u=3471829937,1271960184&fm=193&f=GIF',
         nutrition: {
           calories: 220,
           fat: 8,
@@ -432,7 +422,7 @@ export const createTestData = async (): Promise<void> => {
       },
       {
         title: '可乐鸡翅',
-        description: '甜中带咸，色泽红亮，肉质鲜嫩多汁。',
+        description: '可乐赋予鸡翅独特的风味，甜中带咸，色泽诱人',
         ingredients: [
           '鸡翅中 10个',
           '可乐 1罐',
@@ -460,7 +450,7 @@ export const createTestData = async (): Promise<void> => {
         category: ['家常菜', '卤菜'],
         tags: ['鸡肉', '甜味', '下酒菜'],
         image:
-          'https://images.unsplash.com/photo-1525755662778-989d0524087e?w=800&auto=format&fit=crop&q=60',
+          'https://img.freepik.com/free-photo/roasted-chicken-wings-with-teriyaki-sauce_1339-8380.jpg',
         nutrition: {
           calories: 380,
           fat: 22,

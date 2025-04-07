@@ -39,8 +39,10 @@ const setActiveTab = async (tab: string) => {
 const loadFavoriteRecipes = async () => {
   try {
     isLoading.value = true
-    const data = await recipeStore.fetchFavoriteRecipes()
-    favoriteRecipes.value = data
+    // 直接使用返回的数据设置本地状态，不影响全局食谱列表
+    const favRecipes = await recipeStore.fetchFavoriteRecipes()
+    favoriteRecipes.value = favRecipes
+    console.log('加载收藏食谱成功, 共加载', favRecipes.length, '条数据')
   } catch (error) {
     console.error('加载收藏食谱失败:', error)
   } finally {
@@ -187,9 +189,6 @@ watch(
         <div v-for="recipe in favoriteRecipes" :key="recipe.id" class="recipe-card">
           <div class="recipe-image-container">
             <img :src="recipe.image" :alt="recipe.title" class="recipe-image" />
-            <button @click="toggleFavorite(recipe.id)" class="favorite-btn">
-              <i :class="['fas', recipe.isFavorite ? 'fa-heart' : 'fa-heart']"></i>
-            </button>
           </div>
 
           <div class="recipe-content">
@@ -246,9 +245,6 @@ watch(
         <div v-for="recipe in userRecipes" :key="recipe.id" class="recipe-card">
           <div class="recipe-image-container">
             <img :src="recipe.image" :alt="recipe.title" class="recipe-image" />
-            <button @click="toggleFavorite(recipe.id)" class="favorite-btn">
-              <i :class="['fas', recipe.isFavorite ? 'fa-heart' : 'fa-heart']"></i>
-            </button>
           </div>
 
           <div class="recipe-content">
@@ -608,14 +604,8 @@ h1 {
   transform: translateY(-2px);
 }
 
+/* 移除收藏按钮样式 */
 .favorite-btn {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  background: none;
-  border: none;
-  font-size: 1.2rem;
-  color: #666;
-  cursor: pointer;
+  display: none;
 }
 </style>

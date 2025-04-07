@@ -122,14 +122,14 @@ const addMaterialIcons = () => {
 
           <!-- 用户菜单 -->
           <div v-if="isLoggedIn" class="relative" ref="userMenuContainer">
-            <button
-              @click="toggleUserMenu"
-              class="flex items-center justify-center rounded-full w-10 h-10 overflow-hidden border-2 border-amber-500 hover:border-amber-600 transition-colors"
-            >
+            <button @click="toggleUserMenu" class="avatar-button">
               <img
-                :src="currentUser?.avatar"
+                :src="
+                  currentUser?.avatar ||
+                  'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'
+                "
                 alt="User Avatar"
-                class="w-full h-full object-cover"
+                class="avatar-image"
               />
             </button>
 
@@ -188,6 +188,9 @@ const addMaterialIcons = () => {
         <p>© 2024 美味食谱管理系统 | 享受烹饪的乐趣</p>
       </div>
     </footer>
+
+    <!-- 消息通知容器 -->
+    <div id="message-container"></div>
   </div>
 </template>
 
@@ -197,10 +200,10 @@ const addMaterialIcons = () => {
   --primary-color: #ff6b6b;
   --secondary-color: #4ecdc4;
   --accent-color: #ffd166;
-  --text-color: #2f3542;
+  --text-color: #333;
   --light-bg-color: #f9f7f7;
   --card-bg-color: #ffffff;
-  --border-color: #e8e8e8;
+  --border-color: #e0e0e0;
   --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   --transition: all 0.3s ease;
 
@@ -209,6 +212,8 @@ const addMaterialIcons = () => {
   --container-padding-small: 0.5rem;
   --container-padding-medium: 1rem;
   --container-padding-large: 1.5rem;
+
+  --background-color: #f8f9fa;
 }
 
 /* 全局重置样式 */
@@ -220,9 +225,11 @@ const addMaterialIcons = () => {
 
 /* 基础页面样式 */
 body {
-  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans',
+    'Helvetica Neue', sans-serif;
   color: var(--text-color);
-  background-color: var(--light-bg-color);
+  background-color: var(--background-color);
   line-height: 1.6;
 }
 
@@ -574,5 +581,72 @@ footer {
   :root {
     --container-max-width: 1800px;
   }
+}
+
+/* 消息容器样式 */
+#message-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+#message-container .el-message {
+  pointer-events: auto;
+}
+
+/* Element Plus 全局样式覆盖 */
+.el-message {
+  z-index: 9999 !important;
+  min-width: 300px !important;
+}
+
+.el-message--success {
+  background-color: #f0f9eb !important;
+  border-color: #67c23a !important;
+  padding: 14px 20px !important;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.el-message__content {
+  font-size: 16px !important;
+  font-weight: 500 !important;
+  color: #333 !important;
+}
+
+.el-message__icon {
+  margin-right: 10px !important;
+  font-size: 18px !important;
+}
+
+/* 添加统一的头像样式 */
+.avatar-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #409eff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: none;
+  cursor: pointer;
+  transition: border-color 0.3s;
+}
+
+.avatar-button:hover {
+  border-color: #66b1ff;
+}
+
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 </style>

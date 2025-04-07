@@ -151,9 +151,23 @@ export const recipeApi = {
   // 获取单个食谱
   getRecipe: async (id: string): Promise<{ data: Recipe }> => {
     try {
+      console.log('API层: 请求食谱详情, ID:', id)
       const response = await api.get(`/recipes/${id}`)
-      return response.data
+      console.log('API层: 获取到食谱详情响应:', response)
+
+      // 适配服务器响应结构
+      if (response.data && response.data.data) {
+        // 已经包含正确的格式
+        return response.data
+      } else if (response.data) {
+        // 可能直接返回了数据对象
+        return { data: response.data }
+      } else {
+        console.error('API响应格式不正确')
+        throw new Error('获取食谱详情失败: 响应格式不正确')
+      }
     } catch (error) {
+      console.error('API层: 获取食谱详情失败:', error)
       throw error
     }
   },

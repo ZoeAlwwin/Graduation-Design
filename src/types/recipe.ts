@@ -35,8 +35,9 @@ export interface Recipe {
   cookTime: number
   servings: number
   difficulty: 'easy' | 'medium' | 'hard'
-  tags: string[]
   category: string[]
+  cuisine: string
+  tags: string[]
   ingredients: string[]
   steps: string[]
   nutrition?: NutritionInfo
@@ -48,8 +49,8 @@ export interface Recipe {
   favorites: string[]
   createdAt: Date
   updatedAt: Date
-  isFavorite?: boolean
-  favoriteCount?: number
+  isFavorite: boolean
+  favoriteCount: number
 }
 
 export interface RecipeFilter {
