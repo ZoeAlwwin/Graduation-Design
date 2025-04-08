@@ -169,13 +169,6 @@ JWT_EXPIRES_IN=7d
 
 ### 开发环境运行
 
-```sh
-# 启动MongoDB
-# (根据您的操作系统，可能需要不同的启动命令)
-# macOS: brew services start mongodb-community
-# Windows: net start MongoDB
-# Linux: sudo systemctl start mongod
-
 # 启动后端服务
 cd server && npm run dev
 
