@@ -169,10 +169,10 @@ JWT_EXPIRES_IN=7d
 
 ### 开发环境运行
 
-# 启动后端服务
+启动后端服务
 cd server && npm run dev
 
-# 在另一个终端中启动前端服务
+在另一个终端中启动前端服务
 npm run dev
 ```
 
