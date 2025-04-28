@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="120" height="120" viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <!-- 圆形背景 -->
+  <circle cx="60" cy="60" r="56" fill="#FF6B6B"/>
+  
+  <!-- 厨师帽 -->
+  <path d="M48,30 C48,20 60,20 60,20 C60,20 72,20 72,30 C72,40 78,40 78,40 L42,40 C42,40 48,40 48,30Z" fill="white"/>
+  
+  <!-- 锅 -->
+  <rect x="35" y="40" width="50" height="38" rx="5" fill="white"/>
+  
+  <!-- 锅把手 -->
+  <rect x="85" y="50" width="10" height="18" rx="5" fill="white"/>
+  
+  <!-- 锅盖 -->
+  <ellipse cx="60" cy="40" rx="28" ry="8" fill="white"/>
+  
+  <!-- 汤匙 -->
+  <rect x="45" y="48" width="5" height="30" rx="2" fill="#4ECDC4" transform="rotate(-20, 47.5, 60)"/>
+  <circle cx="40" cy="75" r="8" fill="#4ECDC4"/>
+  
+  <!-- 叉子 -->
+  <rect x="65" y="48" width="5" height="30" rx="2" fill="#FFD166" transform="rotate(20, 67.5, 60)"/>
+  <rect x="75" y="68" width="3" height="10" rx="1" fill="#FFD166" transform="rotate(70, 76.5, 72)"/>
+  <rect x="75" y="68" width="3" height="10" rx="1" fill="#FFD166" transform="rotate(90, 76.5, 72)"/>
+  <rect x="75" y="68" width="3" height="10" rx="1" fill="#FFD166" transform="rotate(110, 76.5, 72)"/>
+  
+  <!-- 底部文字 -->
+  <text x="60" y="100" font-family="Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" fill="white">美味食谱</text>
+</svg> 
